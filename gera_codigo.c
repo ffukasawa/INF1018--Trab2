@@ -1,8 +1,5 @@
-/* 
-   Trab 2 - INF1018
-   Fernanda Fukasawa Amarante 2410444 3WA
-   Filipe Izidoro Reis 2410329 3WC
-*/
+//Filipe Izidoro Reis – 2410329 – 3WC
+//Fernanda Fukasawa Amarante – 2410444 – 3WA
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,12 +14,13 @@ v1 -> -8(%rbp)
 v2 -> -12(%rbp)
 v3 -> -16(%rbp)
 v4 -> -20(%rbp)
-p0 -> -24(%rbp)
+p0 -> -24(%rbp) | %edi
 */
 
 //------------------------------------------------funcao de erro------------------------------------------------
 static void error (const char *msg, int line) {
-    fprintf(stderr, "erro %s na linha %d\n", msg, line);
+    if (line > 0) fprintf(stderr, "erro %s na linha %d\n", msg, line);
+    fprintf(stderr, "erro %s\n", msg);
     exit(EXIT_FAILURE);
 }
 
@@ -47,7 +45,7 @@ static void gera_prologo(unsigned char cod[], int *ppos){
   emite_byte(cod, ppos, 0x48);
   emite_byte(cod, ppos, 0x89);
   emite_byte(cod, ppos, 0xe5);
-  //subq $32, %rsp    espaco para 5 variaveis locais e 1 de saida (p0)
+  //subq $32, %rsp    espaco para 5 variaveis locais e 1 de entrada (p0)
   emite_byte(cod, ppos, 0x48);
   emite_byte(cod, ppos, 0x83);
   emite_byte(cod, ppos, 0xec);
@@ -67,13 +65,13 @@ static void gera_epilogo(unsigned char cod[], int *ppos) {
 //------------------------------------------------funcao de carregar------------------------------------------------
 static void carrega_varpc_em_eax(unsigned char cod[], int *ppos, char var, int idx){
    if (var == '$') {
-        // mov $idx, %eax
+        // movl $idx, %eax
         emite_byte(cod, ppos, 0xb8);   
         emite_int (cod, ppos, idx);     // constante em 4 bytes
     }
     else if (var == 'v') {
-        // mov offset(%rbp), %eax
-        int offset = -4 * (idx + 1);    // v0:-4, v1:-8, v2:-12, ...
+        // movl offset(%rbp), %eax
+        int offset = -4 * (idx + 1);    // v0:-4, v1:-8, v2:-12, v3:-16, v4:-20
         emite_byte(cod, ppos, 0x8b);
         emite_byte(cod, ppos, 0x45);
         emite_byte(cod, ppos, (unsigned char)offset);
@@ -84,39 +82,39 @@ static void carrega_varpc_em_eax(unsigned char cod[], int *ppos, char var, int i
         emite_byte(cod, ppos, 0x45);
         emite_byte(cod, ppos, 0xe8);    // -24 = 0xe8
     }
-else {
-        error("operando invalido no carregamento em EAX", 0);
+    else{
+      error("Uso de operando invalido.", -1);
     }
-
 }
 
 //------------------------------------------------funcao de salvar------------------------------------------------
 static void salva_eax_em_var(unsigned char cod[], int *ppos, char var, int idx){
   if (var == 'v') {
     int offset = -4 * (idx + 1);
-  //mov eax, idx
+  //movl eax, offset(%rbp)
     emite_byte(cod, ppos, 0x89); 
     emite_byte(cod, ppos, 0x45); 
     emite_byte(cod, ppos, (unsigned char)offset);
-  } else if (var == 'p') {
-// guarda o valor de eax em p0
+  } 
+  else if (var == 'p') {
+  // guarda o valor de eax em p0
     
     emite_byte(cod, ppos, 0x89); 
     emite_byte(cod, ppos, 0x45); 
     emite_byte(cod, ppos, 0xe8);
-  } else {
-    error("destino invalido no salvamento de EAX", 0);
+  }
+  else{
+    error("Uso de operando invalido.", -1);
   }
 }
 
-
-//------------------------------funcao de operacoes------------------------------------------------
+//------------------------------------------------funcao de operacoes------------------------------------------------
 static void gera_oper(unsigned char cod[], int *ppos,
                       char var0, int idx0,
                       char var1, int idx1,
                       char op, char var2, int idx2)
 {
-/* var0 = var1 op var2 */
+  /* var0 = var1 op var2 */
 
   /* carrega var1 em eax */
   carrega_varpc_em_eax(cod, ppos, var1, idx1);
@@ -124,42 +122,42 @@ static void gera_oper(unsigned char cod[], int *ppos,
   /* carrega var2 em ecx */
   if (var2 == 'v') {
       int offset = -4 * (idx2 + 1);
-      emite_byte(cod, ppos, 0x8B); 
-      emite_byte(cod, ppos, 0x4D); 
-      emite_byte(cod, ppos, (unsigned char)offset); /* carrega variável local em ecx */
+      emite_byte(cod, ppos, 0x8b); 
+      emite_byte(cod, ppos, 0x4d); 
+      emite_byte(cod, ppos, (unsigned char)offset); /* carrega variavel local em ecx */
   } 
   else if (var2 == 'p') {
-      emite_byte(cod, ppos, 0x8B); 
-      emite_byte(cod, ppos, 0x4D); 
-      emite_byte(cod, ppos, 0xE8); /* carrega p0 em ecx */
+      emite_byte(cod, ppos, 0x8b); 
+      emite_byte(cod, ppos, 0x4d); 
+      emite_byte(cod, ppos, 0xe8); /* carrega p0 em ecx */
   } 
   else if (var2 == '$') {
-      emite_byte(cod, ppos, 0xB9); 
+      emite_byte(cod, ppos, 0xb9); 
       emite_int(cod, ppos, idx2); /* ecx = constante */
   } 
   else {
-      error("operando invalido no load em ecx", 0);
+      error("Uso de operando invalido.", -1);
   }
 
   /* aplica operacao: */
   if (op == '+'){
     /* add eax, ecx  -> 01 C8 */
     emite_byte(cod, ppos, 0x01); 
-    emite_byte(cod, ppos, 0xC8);
+    emite_byte(cod, ppos, 0xc8);
   }
   else if (op == '-'){
     /* sub eax, ecx -> 29 C8 */
     emite_byte(cod, ppos, 0x29); 
-    emite_byte(cod, ppos, 0xC8);
+    emite_byte(cod, ppos, 0xc8);
   }
   else if (op == '*'){
     /* imul eax, ecx -> 0F AF C1 */
-    emite_byte(cod, ppos, 0x0F); 
-    emite_byte(cod, ppos, 0xAF); 
-    emite_byte(cod, ppos, 0xC1);
+    emite_byte(cod, ppos, 0x0f); 
+    emite_byte(cod, ppos, 0xaf); 
+    emite_byte(cod, ppos, 0xc1);
   }
   else {
-    error("operador desconhecido", 0);
+    error("Uso de operador desconhecido.", -1);
   }
 
   /* salva eax em var0 */
@@ -168,11 +166,11 @@ static void gera_oper(unsigned char cod[], int *ppos,
 
 //------------------------------------------------funcao de retorno------------------------------------------------
 static void gera_ret(unsigned char cod[], int *ppos, char var0, int idx0) {
-    carrega_varpc_em_eax(cod, ppos, var0, idx0);
-    gera_epilogo(cod, ppos);
+  carrega_varpc_em_eax(cod, ppos, var0, idx0);
+  gera_epilogo(cod, ppos);
 }
 
-//----------------------------------------------funcao de z_retorno------------------------------------------------
+//------------------------------------------------funcao de z_retorno------------------------------------------------
 static void gera_zret(unsigned char cod[], int *ppos,
                       char var0, int idx0,
                       char var1, int idx1)
@@ -219,8 +217,8 @@ static void gera_zret(unsigned char cod[], int *ppos,
   /* a == 0: carregar b (var1) em eax e retornar */
   carrega_varpc_em_eax(cod, ppos, var1, idx1);
   gera_epilogo(cod, ppos);
-}
 
+}
 
 //------------------------------------------------funcao de call------------------------------------------------
 static void gera_call(unsigned char cod[], int *ppos,
@@ -237,7 +235,7 @@ static void gera_call(unsigned char cod[], int *ppos,
 
   } 
   else if (var1 == 'p') {
-    /* coloca p0 em EDI -> mov -24(%rbp), %edi */
+    /* coloca p0 em EDI -> mov %edi, -24(%rbp) */
     emite_byte(cod, ppos, 0x8B); 
     emite_byte(cod, ppos, 0x7D); 
     emite_byte(cod, ppos, 0xE8);
@@ -247,7 +245,7 @@ static void gera_call(unsigned char cod[], int *ppos,
     emite_int(cod, ppos, idx1); /* mov edi, idx1 */
   } 
   else {
-    error("operando invalido no call", 0);
+    error("operando invalido no call", -1);
   }
 
  /* ajusta a pilha para manter o alinhamento -> sub rsp, 8*/
@@ -275,8 +273,7 @@ static void gera_call(unsigned char cod[], int *ppos,
   salva_eax_em_var(cod, ppos, var0, idx0);
 }
 
-
-//--------------------------------------------funcao de compilação------------------------------------------------
+//------------------------------------------------funcao de compilação------------------------------------------------
 void gera_codigo (FILE *f, unsigned char code[], funcp *entry) {
   int line = 1;
   int c;
@@ -372,5 +369,3 @@ void gera_codigo (FILE *f, unsigned char code[], funcp *entry) {
 
   *entry = (funcp)(code + inicio_ultima_funcao);
   }
-
-

@@ -1,0 +1,86 @@
+Relatório do Trabalho - Geração de Código LBS
+Integrantes do grupo:
+Fernanda Fukasawa Amarante – 2410444 – 3WA
+Filipe Izidoro Reis – 2410329 – 3WC
+
+Objetivo do Trabalho
+Este trabalho teve como objetivo implementar, em C, um gerador de código para uma linguagem simples chamada LBS. O programa recebe instruções da linguagem e traduz cada comando para código de máquina x86-64, manipulando registradores, pilha e chamadas de função conforme especificado.
+
+O que foi implementado
+O nosso gerador de código consegue traduzir todas as instruções obrigatórias da linguagem LBS sem problemas. As operações aritméticas (+, -, *) funcionam como esperado, e conseguimos acessar os registradores temporários (v0, v1, etc.) e os parâmetros das funções (como p0 e p1) corretamente. A instrução ret foi implementada de forma que o valor retornado fique no registrador certo antes de finalizar a função. Já a zret também está funcionando, fazendo a verificação da condição como o enunciado pediu. A instrução call, usada para chamar outras funções, calcula o endereço relativo da função que será chamada.
+Além disso, fizemos o controle da pilha completo, com prólogo e epílogo, como manda o padrão da arquitetura. Isso permite que as funções rodem corretamente, inclusive funções recursivas e aquelas que chamam outras funções.
+
+
+O que está Funcionando e o que Não está Funcionando
+Todos os requisitos funcionais definidos no enunciado foram implementados com sucesso. As operações aritméticas, as instruções de retorno, chamadas de função, uso de registradores temporários, parâmetros e manipulação da pilha funcionam corretamente.
+Durante os testes, não foram encontrados erros de execução ou de tradução das instruções da linguagem LBS. O programa não realiza uma verificação sintática completa para detectar programas com erros, mas essa funcionalidade não foi exigida pelo enunciado e, portanto, a sua ausência não compromete a implementação. Assim, não há funcionalidades pendentes ou incorretas em relação ao que foi solicitado.
+
+
+Exemplos Testados
+A seguir, estão exemplos utilizados para validar o gerador, incluindo funções que retornam valores constantes, operações simples e chamadas recursivas:
+
+1. Função que retorna uma constante
+function
+ret $100
+end
+
+Resultado: 
+	entrada 3000000001 -> f(-1294967295) = 100 (overflow, como esperado, mas saída correta)
+	f(10000) = 100
+Em valores fora do intervalo de 32 bits, ocorre overflow na conversão do parâmetro antes da execução da função. Mesmo assim, o retorno permanece 100, comprovando que a instrução ret foi corretamente implementada e não depende do valor recebido.
+
+2. Função que soma 1 ao parâmetro
+function
+v0 = p0 + $1
+ret v0
+end
+
+Resultado:
+	f(-31) = -30 (correto)
+	entrada 3000000001 -> f(-1294967295) = -1294967294 (overflow, como esperado)
+	f(300) = 301 (correto)
+O segundo caso mostra novamente overflow no argumento, mas a operação aritmética foi executada corretamente sobre o valor recebido.
+
+3. Fatorial recursivo
+function
+zret p0 $1
+v0 = p0 + $0
+v1 = v0 - $1
+v1 = call 0 v1
+v0 = v0 * v1
+ret v0
+end
+
+Resultado:
+	f(30) = 1409286144 (fatorial explode para inteiro)
+	f(150) = 0	(fatorial explode para inteiro)
+	f(10) = 3628800 (saída correta para números pequenos, como esperado)
+Durante os testes com a função fatorial, os resultados foram corretos para valores pequenos (por exemplo, p0 = 10 resulta em 3 628 800). Entretanto, a partir de p0 = 13 o valor do fatorial excede o limite de representação de um inteiro de 32 bits, ocasionando overflow. Como a linguagem LBS define apenas o tipo int com sinal, este comportamento é esperado. Assim, valores como 20, 32 ou 90 resultam em números negativos ou zero, não por erro no gerador de código, mas devido à saturação do tipo inteiro.
+
+4. Soma dos quadrados
+function
+v0 = p0 * p0
+ret v0
+end
+
+
+function
+zret p0 $0
+v0 = p0 - $1
+v1 = call 0 p0
+v0 = call 1 v0
+v0 = v0 + v1
+ret v0
+end
+
+Resultado: 
+	f(-31) = segmentation fault (core dumped)
+	f(300) = 9045050 (correto)
+	f(10000) = -1624114088 (correto)
+	f(10) = 385 (correto)
+O primeiro caso tal comportamento ocorre porque a função recursiva que implementa a soma dos quadrados não possui condição de parada para valores negativos. Assim, quando p0 < 0, a recursão nunca atinge o caso base (p0 == 0), resultando em chamadas sucessivas até o estouro da pilha. Esse comportamento não representa um erro na geração de código, mas sim uma limitação lógica da função escrita em LBS.
+
+
+Conclusão
+O gerador de código desenvolvido implementa corretamente todas as funcionalidades exigidas no enunciado. O programa traduz instruções da linguagem LBS para código executável em x86-64, usando chamadas recursivas, operações aritméticas e estrutura de pilha corretamente.
+A implementação foi validada com múltiplos exemplos, incluindo funções simples e recursivas, e todas funcionaram como esperado.
