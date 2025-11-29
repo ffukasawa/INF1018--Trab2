@@ -237,7 +237,7 @@ static void gera_call(unsigned char cod[], int *ppos,
 
   } 
   else if (var1 == 'p') {
-    /* coloca p0 em EDI -> mov %edi, -24(%rbp) */
+    /* coloca p0 em EDI -> mov -24(%rbp), %edi */
     emite_byte(cod, ppos, 0x8B); 
     emite_byte(cod, ppos, 0x7D); 
     emite_byte(cod, ppos, 0xE8);
